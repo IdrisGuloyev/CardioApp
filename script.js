@@ -8,11 +8,51 @@ const inputDuration = document.querySelector('.form__input--duration');
 const inputTemp = document.querySelector('.form__input--temp');
 const inputClimb = document.querySelector('.form__input--climb');
 
-let map, mapEvent;
+class Workout {
+  date = new Date();
+  id = (Date.now() + '').slice(-10);
+  constructor(coords, distance, duration) {
+    this.coords = coords;
+    this.distance = distance; //km
+    this.duration = duration; // min
+  }
+}
+
+class Running extends Workout {
+  type = 'running';
+
+  constructor(coords, distance, duration, temp) {
+    super(coords, distance, duration);
+    this.temp = temp;
+    this.calculatePace();
+  }
+
+  calculatePace() {
+    this.pace = this.duration / this.distance;
+  }
+}
+
+class Cycling extends Workout {
+  type = 'cycling';
+
+  constructor(coords, distance, duration, climb) {
+    super(coords, distance, duration);
+    this.climb = climb;
+    this.calculateSpeed();
+  }
+
+  calculateSpeed() {
+    this.speed = this.distance / this.duration / 60;
+  }
+}
+
+// const running = new Running([50, 39, 7, 40, 170]);
+// const cycling = new Cycling([50, 39, 37, 80, 370]);
 
 class App {
   #map;
   #mapEvent;
+  #workouts = [];
 
   constructor() {
     this._getPosition();
@@ -63,7 +103,61 @@ class App {
   }
 
   _newWorkout(e) {
+    const areNumbers = (...numbers) =>
+      numbers.every(num => Number.isFinite(num));
+
+    const areNumbersPositive = (...numbers) => numbers.every(num => num > 0);
+
     e.preventDefault();
+
+    const { lat, lng } = this.#mapEvent.latlng;
+    let workout;
+    // Получить данные из формы
+
+    const type = inputType.value;
+    const distance = +inputDistance.value;
+    const duration = +inputDuration.value;
+
+    // Running
+    if (type === 'running') {
+      const temp = +inputTemp.value;
+      // Проверка валидности данных
+      if (
+        // !Number.isFinite(distance) ||
+        // !Number.isFinite(duration) ||
+        // !Number.isFinite(temp)
+        !areNumbers(distance, duration, temp) ||
+        !areNumbersPositive(distance, duration, temp)
+      )
+        return alert('Введите положительное число!');
+
+      workout = new Running([lat, lng], distance, duration, temp);
+    }
+    // Cycling
+    if (type === 'cycling') {
+      const climb = +inputClimb.value;
+      // Проверка валидности данных
+      if (
+        // !Number.isFinite(distance) ||
+        // !Number.isFinite(duration) ||
+        // !Number.isFinite(climb)
+        !areNumbers(distance, duration, climb) ||
+        !areNumbersPositive(distance, duration)
+      )
+        return alert('Введите положительное число!');
+
+      workout = new Cycling([lat, lng], distance, duration, climb);
+    }
+
+    // Добавить новый объект в массив тренеровок
+    this.#workouts.push(workout);
+
+    // Отобразить тренировку на карте
+    this.displayWorkout(workout);
+
+    // Отобразить тренировку в списке
+
+    // Спрятать форму
 
     // Очистка полей ввода данных
     inputDistance.value =
@@ -71,10 +165,10 @@ class App {
       inputTemp.value =
       inputClimb.value =
         '';
-    // Отображение маркера
-    const { lat, lng } = this.#mapEvent.latlng;
+  }
 
-    L.marker([lat, lng])
+  displayWorkout(workout) {
+    L.marker(workout.coords)
       .addTo(this.#map)
       .bindPopup(
         L.popup({
@@ -82,7 +176,7 @@ class App {
           minWidth: 100,
           autoClose: false,
           closeOnClick: false,
-          className: 'running-popup',
+          className: `${workout.type}-popup`,
         })
       )
       .setPopupContent('Тренировка')
