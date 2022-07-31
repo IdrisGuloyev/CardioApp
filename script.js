@@ -68,7 +68,13 @@ class App {
   #workouts = [];
 
   constructor() {
+    // Получение местоположения пользователя
     this._getPosition();
+
+    // Получение данных из Local Storage
+    this._getLocalStorageData();
+
+    // Добавление обработчика событий
     form.addEventListener('submit', this._newWorkout.bind(this));
     inputType.addEventListener('change', this._toggleClimbField);
     containerWorkouts.addEventListener('click', this._moveToWorkout.bind(this));
@@ -102,6 +108,11 @@ class App {
 
     // Обработка кликов на карте
     this.#map.on('click', this._showForm.bind(this));
+
+    // Отображение тренеровок из Local Storage на карте
+    this.#workouts.forEach(workout => {
+      this._displayWorkout(workout);
+    });
   }
 
   _showForm(e) {
@@ -184,6 +195,9 @@ class App {
     // Спрятать форму
 
     this._hideForm();
+
+    // Добавить тренеровки в LOcal Storage
+    this._addWorkoutsToLocalStorage();
 
     // Очистка полей ввода данных
   }
@@ -275,6 +289,27 @@ class App {
         duration: 1,
       },
     });
+  }
+
+  _addWorkoutsToLocalStorage() {
+    localStorage.setItem('workouts', JSON.stringify(this.#workouts));
+  }
+
+  _getLocalStorageData() {
+    const data = JSON.parse(localStorage.getItem('workouts'));
+
+    if (!data) return;
+
+    this.#workouts = data;
+
+    this.#workouts.forEach(workout => {
+      this._displayWorkoutOnSidebar(workout);
+    });
+  }
+
+  reset() {
+    localStorage.removeItem('workouts');
+    location.reload();
   }
 }
 
