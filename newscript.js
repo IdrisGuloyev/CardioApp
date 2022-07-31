@@ -11,21 +11,26 @@ const inputClimb = document.querySelector('.form__input--climb');
 class Workout {
   date = new Date();
   id = (Date.now() + '').slice(-10);
+  clickNumber = 0;
 
   constructor(coords, distance, duration) {
     this.coords = coords;
-    this.distance = distance; //km
+    this.distance = distance; // km
     this.duration = duration; // min
   }
 
   _setDescription() {
     this.type === 'running'
-      ? (this.description = `Пробежка ${new Intl.DateTimeFormat('ru-Ru').format(
+      ? (this.descrition = `Пробежка ${new Intl.DateTimeFormat('ru-Ru').format(
           this.date
         )}`)
-      : (this.description = `Велотренеровка ${new Intl.DateTimeFormat(
+      : (this.descrition = `Велотренировка ${new Intl.DateTimeFormat(
           'ru-Ru'
         ).format(this.date)}`);
+  }
+
+  click() {
+    this.clickNumber++;
   }
 }
 
@@ -40,10 +45,10 @@ class Running extends Workout {
   }
 
   calculatePace() {
+    // min/km
     this.pace = this.duration / this.distance;
   }
 }
-
 class Cycling extends Workout {
   type = 'cycling';
 
@@ -55,12 +60,14 @@ class Cycling extends Workout {
   }
 
   calculateSpeed() {
+    // km/h
     this.speed = this.distance / this.duration / 60;
   }
 }
 
-// const running = new Running([50, 39, 7, 40, 170]);
-// const cycling = new Cycling([50, 39, 37, 80, 370]);
+// const running = new Running([50, 39], 7, 40, 170);
+// const cycling = new Cycling([50, 39], 37, 80, 370);
+// console.log(running, cycling);
 
 class App {
   #map;
@@ -68,7 +75,13 @@ class App {
   #workouts = [];
 
   constructor() {
+    // Получение местоположения пользователя
     this._getPosition();
+
+    // Получение данных из local storage
+    this._getLocalStorageData();
+
+    // Добавление обработчиков события
     form.addEventListener('submit', this._newWorkout.bind(this));
     inputType.addEventListener('change', this._toggleClimbField);
     containerWorkouts.addEventListener('click', this._moveToWorkout.bind(this));
@@ -79,7 +92,7 @@ class App {
       navigator.geolocation.getCurrentPosition(
         this._loadMap.bind(this),
         function () {
-          alert('Невозможно получить Ваше местоположение');
+          alert('Невозможно получить ваше местоположение');
         }
       );
     }
@@ -88,20 +101,26 @@ class App {
   _loadMap(position) {
     const { latitude } = position.coords;
     const { longitude } = position.coords;
-    console.log(`https://www.google.com/maps/@${latitude},${longitude},16.83z`);
+    console.log(`https://www.google.com/maps/@${latitude},${longitude},14z`);
 
     const coords = [latitude, longitude];
+
     console.log(this);
-
     this.#map = L.map('map').setView(coords, 13);
+    // console.log(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(this.#map);
 
-    // Обработка кликов на карте
+    // Обработка клика на карте
     this.#map.on('click', this._showForm.bind(this));
+
+    // Отображение тренировок из local storage на карте
+    this.#workouts.forEach(workout => {
+      this._displayWorkout(workout);
+    });
   }
 
   _showForm(e) {
@@ -140,7 +159,7 @@ class App {
     const distance = +inputDistance.value;
     const duration = +inputDuration.value;
 
-    // Running
+    // Если тренировка является пробежкой, создать объект Running
     if (type === 'running') {
       const temp = +inputTemp.value;
       // Проверка валидности данных
@@ -155,7 +174,8 @@ class App {
 
       workout = new Running([lat, lng], distance, duration, temp);
     }
-    // Cycling
+
+    // Если тренировка является велотренировкой, создать объект Cycling
     if (type === 'cycling') {
       const climb = +inputClimb.value;
       // Проверка валидности данных
@@ -171,21 +191,20 @@ class App {
       workout = new Cycling([lat, lng], distance, duration, climb);
     }
 
-    // Добавить новый объект в массив тренеровок
+    // Добавить новый объект в массив тренировок
     this.#workouts.push(workout);
 
     // Отобразить тренировку на карте
     this._displayWorkout(workout);
 
     // Отобразить тренировку в списке
-
     this._displayWorkoutOnSidebar(workout);
 
-    // Спрятать форму
-
+    // Спрятать форму и очистить поля ввода данных
     this._hideForm();
 
-    // Очистка полей ввода данных
+    // Добавить все тренировки в локальное хранилище
+    this._addWorkoutsToLocalStorage();
   }
 
   _displayWorkout(workout) {
@@ -201,15 +220,15 @@ class App {
         })
       )
       .setPopupContent(
-        `${workout.type === 'running' ? '🏃' : '🚵‍♂️'} ${workout.description}`
+        `${workout.type === 'running' ? '🏃' : '🚵‍♂️'} ${workout.descrition}`
       )
       .openPopup();
   }
 
   _displayWorkoutOnSidebar(workout) {
     let html = `
-    <li class="workout workout--" data-id="${workout.id}">
-      <h2 class="workout__title">${workout.description}</h2>
+    <li class="workout workout--${workout.type}" data-id="${workout.id}">
+      <h2 class="workout__title">${workout.descrition}</h2>
       <div class="workout__details">
         <span class="workout__icon">${
           workout.type === 'running' ? '🏃' : '🚵‍♂️'
@@ -222,9 +241,8 @@ class App {
         <span class="workout__value">${workout.duration}</span>
         <span class="workout__unit">мин</span>
       </div>
-     
+    
     `;
-
     if (workout.type === 'running') {
       html += `
           <div class="workout__details">
@@ -253,7 +271,7 @@ class App {
             <span class="workout__value">${workout.climb}</span>
             <span class="workout__unit">м</span>
           </div>
-        </li>
+      </li>
       `;
     }
 
@@ -262,6 +280,7 @@ class App {
 
   _moveToWorkout(e) {
     const workoutElement = e.target.closest('.workout');
+    console.log(workoutElement);
 
     if (!workoutElement) return;
 
@@ -275,6 +294,28 @@ class App {
         duration: 1,
       },
     });
+  }
+
+  _addWorkoutsToLocalStorage() {
+    localStorage.setItem('workouts', JSON.stringify(this.#workouts));
+  }
+
+  _getLocalStorageData() {
+    const data = JSON.parse(localStorage.getItem('workouts'));
+    console.log(data);
+
+    if (!data) return;
+
+    this.#workouts = data;
+
+    this.#workouts.forEach(workout => {
+      this._displayWorkoutOnSidebar(workout);
+    });
+  }
+
+  reset() {
+    localStorage.removeItem('workouts');
+    location.reload();
   }
 }
 
